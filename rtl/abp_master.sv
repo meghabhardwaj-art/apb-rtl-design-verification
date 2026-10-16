@@ -1,9 +1,8 @@
-//// APB Master
-
-module apb_m
+module apb_m_top
   (
     input pclk,
     input presetn,
+    input [1:0] slv_addr_in, /// 01 - slave1 , 10 - slave2
     input [3:0] addrin,
     input [7:0] datain,
     input wr,
@@ -11,12 +10,13 @@ module apb_m
     input [7:0] prdata,
     input pready,
     
-    output reg psel,
+    output reg psel1,psel2,
     output reg penable,
+    output reg slverr,
     output reg [3:0] paddr,
     output reg [7:0] pwdata,
     output reg pwrite,
-    output reg [7:0] dataout
+    output [7:0] dataout
     
   
   );
@@ -74,25 +74,41 @@ module apb_m
       endcase
       
     end
-
 ////////////////address decoding
 always@(posedge pclk, negedge presetn)
     begin
         if(presetn == 1'b0)
             begin
-              psel <= 1'b0;
+              psel1 <= 1'b0;
+              psel2 <= 1'b0;
             end
          else if (nstate == idle)
             begin
-              psel <= 1'b0;
+              psel1 <= 1'b0;
+              psel2 <= 1'b0;
             end
          else if (nstate == enable || nstate == setup)
             begin
-             psel <= 1'b1;
-            end
+             if(slv_addr_in == 2'b01)
+             begin
+                psel1 <= 1'b1;
+                psel2 <= 1'b0;
+             end
+             else if (slv_addr_in == 2'b10)
+             begin
+               psel1 <= 1'b0;
+               psel2 <= 1'b1;
+             end
+            else 
+             begin
+               psel1 <= 1'b0;
+               psel2 <= 1'b0;
+             end
+           end
          else 
             begin
-             psel <= 1'b0;
+              psel1 <= 1'b0;
+              psel2 <= 1'b0;
             end     
     end
  
@@ -119,10 +135,10 @@ always@(posedge pclk, negedge presetn)
             penable <= 1'b0;
             paddr   <= addrin;
             pwrite  <= wr;
-            if(wr == 1'b1)
-                begin
-                pwdata <= datain;
-                end
+             if(wr == 1'b1)
+                  begin
+                  pwdata <= datain;
+                  end
              end
         else if (nstate == enable)
             begin
@@ -130,6 +146,5 @@ always@(posedge pclk, negedge presetn)
             end
      end
  
- assign dataout = (psel == 1'b1 && penable == 1'b1 && wr == 1'b0) ? prdata : 8'h00;
- 
+assign dataout = ((psel1 == 1'b1 || psel2 == 1'b1) && penable == 1'b1 && wr == 1'b0) ? prdata : 8'h00; 
 endmodule
